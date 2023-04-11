@@ -1,15 +1,15 @@
 <template>
-  <q-dialog id="dialog" ref="dialog" @hide="() => $emit('hide')">
+  <q-dialog id="dialog" ref="dialog" @hide="() => $emit('hide')" persistent>
     <q-card style="width: 50%; min-width: 500px; max-width: unset">
       <q-card-section id="title-section">
         <div class="text-h4" style="overflow: hidden">Nieuw event</div>
       </q-card-section>
       <q-form @submit.prevent="onSave">
         <q-card-section class="q-gutter-y-sm">
-          <q-input filled v-model="location" label="Waar *" lazy-rules :rules="[(val) => (val && val.length > 0) || 'Veld is verplicht']" />
+          <q-input filled v-model="eventName" label="Wat *" lazy-rules :rules="[(val) => (val && val.length > 0) || 'Veld is verplicht']" />
           <q-input filled v-model="name" label="Door wie *" lazy-rules :rules="[(val) => (val && val.length > 0) || 'Veld is verplicht']" />
 
-          <q-select v-model="day" :options="schedule.days" :option-label="(item) => (item === null ? '' : schedule.days[item].name)" filled />
+          <q-select v-model="day" :options="schedule.days.map((_, index) => index)" :option-label="(item) => (item === null ? '' : schedule.days[item].name)" filled />
           <div class="row items-center justify-between">
             <div class="cursor-pointer">
               Begint om {{ timeStart }}
@@ -61,9 +61,9 @@ export default defineComponent({
     return {
       schedule,
       name: ref(''),
-      location: ref(''),
-      timeStart: ref('08:30'),
-      timeEnd: ref('17:30'),
+      eventName: ref(''),
+      timeStart: ref('08:00'),
+      timeEnd: ref('17:00'),
       day: ref(0),
     };
   },
@@ -75,7 +75,7 @@ export default defineComponent({
       this.dialogComponent.hide();
     },
     onSave() {
-      const slot = this.schedule.createSlot(this.location, this.name, Time.parse(this.timeStart), Time.parse(this.timeEnd));
+      const slot = this.schedule.createSlot(this.eventName.trim(), this.name.trim(), Time.parse(this.timeStart), Time.parse(this.timeEnd));
 
       const track = this.schedule.getTrack(this.day, slot);
       this.schedule.addSlot(this.day, track.id, slot);

@@ -70,14 +70,14 @@ export class Track {
 
 export class Slot {
   id: string;
-  location: string;
+  eventName: string;
   persons: string;
   start: Time;
   end: Time;
 
-  constructor(id: string, location: string, persons: string, start: Time, end: Time) {
+  constructor(id: string, eventName: string, persons: string, start: Time, end: Time) {
     this.id = id;
-    this.location = location;
+    this.eventName = eventName;
     this.persons = persons;
     this.start = start;
     this.end = end;
@@ -132,8 +132,8 @@ export const useScheduleStore = defineStore(
   () => {
     const days: Ref<Day[]> = ref([new Day('Maandag'), new Day('Dinsdag'), new Day('Woensdag'), new Day('Donderdag'), new Day('Vrijdag')]);
 
-    const createSlot = (location: string, persons: string, start: Time, end: Time) => {
-      return new Slot(uuidv4(), location, persons, start, end);
+    const createSlot = (eventName: string, persons: string, start: Time, end: Time) => {
+      return new Slot(uuidv4(), eventName, persons, start, end);
     };
 
     const getTrack = (dayIndex: number, slot: Slot) => {
@@ -161,7 +161,7 @@ export const useScheduleStore = defineStore(
           Object.values(rawDay.tracks).forEach((rawTrack) => {
             const validSlots: { [key: string]: Slot } = {};
             Object.values(rawTrack.slots).forEach((rawSlot) => {
-              const validSlot = new Slot(rawSlot.id, rawSlot.location, rawSlot.persons, new Time(rawSlot.start.hour, rawSlot.start.minute), new Time(rawSlot.end.hour, rawSlot.end.minute));
+              const validSlot = new Slot(rawSlot.id, rawSlot.eventName, rawSlot.persons, new Time(rawSlot.start.hour, rawSlot.start.minute), new Time(rawSlot.end.hour, rawSlot.end.minute));
               validSlots[validSlot.id] = validSlot;
             });
 

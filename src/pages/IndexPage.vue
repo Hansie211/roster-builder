@@ -1,6 +1,6 @@
 <template>
   <q-page>
-    <q-btn icon="add" @click="onAdd" class="q-mt-sm" round color="primary" />
+    <q-btn icon="add" @click="onAdd" class="q-mt-sm print-hide" round color="primary" />
     <div class="schedule track">
       <div class="time-slots track full-track">
         <div v-for="block in timeBlocks" :key="block.toKey()" class="time-slot" :style="{ 'grid-row': 'time-' + block.toKey() }">
@@ -9,7 +9,7 @@
         </div>
       </div>
 
-      <div class="day-track full-track" v-for="day in days" :key="day.name">
+      <div class="day-track full-track" v-for="day in schedule.days" :key="day.name">
         <div class="title text-h5 q-pt-sm">{{ day.name }}</div>
         <div class="tracks">
           <div class="track" v-for="track in day.getTracks()" :key="track.id">
@@ -18,7 +18,7 @@
                 <q-btn icon="delete" size="sm" round flat @click="() => removeSlot(day, track, slot)" />
               </div>
               <div class="slot-content">
-                <div>{{ slot.location }}</div>
+                <div>{{ slot.eventName }}</div>
                 <div>{{ slot.persons }}</div>
               </div>
             </div>
@@ -40,11 +40,8 @@ export default defineComponent({
   setup() {
     const schedule = useScheduleStore();
 
-    //const { days } = storeToRefs(schedule);
-
     return {
       schedule,
-      days: schedule.days,
     };
   },
   methods: {
@@ -165,6 +162,8 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
 
+  position: relative;
+
   height: calc(100% - 2px);
   padding: 2px;
   margin-left: 1px;
@@ -174,6 +173,19 @@ export default defineComponent({
   border: 1px solid black;
   background-color: white;
   border-radius: 5px;
+}
+
+.slot-header {
+  display: none;
+
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+}
+
+.slot:hover .slot-header {
+  display: flex;
 }
 
 .full-track {
