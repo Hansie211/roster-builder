@@ -2,8 +2,8 @@
   <q-page>
     <q-btn icon="add" @click="onAdd" class="q-mt-sm print-hide" round color="primary" />
     <div class="schedule track">
-      <div class="time-slots track full-track">
-        <div v-for="block in timeBlocks" :key="block.toKey()" class="time-slot" :style="{ 'grid-row': 'time-' + block.toKey() }">
+      <div class="time-slots track full-track" :style="CssGridTemplateRows">
+        <div v-for="block in timeBlocks.filter((block) => block.minute === 0 || block.minute === 30)" :key="block.toKey()" class="time-slot" :style="{ 'grid-row': `time-${block.toKey()} / time-${nextBlock(block).toKey()}` }">
           <div v-if="block.minute === 0" class="line"></div>
           {{ block }}
         </div>
@@ -12,13 +12,14 @@
       <div class="day-track full-track" v-for="day in schedule.days" :key="day.name">
         <div class="title text-h5 q-pt-sm">{{ day.name }}</div>
         <div class="tracks">
-          <div class="track" v-for="track in day.getTracks()" :key="track.id">
+          <div class="track" :style="CssGridTemplateRows" v-for="track in day.getTracks()" :key="track.id">
             <div v-for="slot in track.getSlots()" :key="slot.id" class="slot" :style="{ 'grid-row': `time-${slot.start.toKey()} / time-${slot.end.toKey()}` }">
               <div class="slot-header flex row justify-end">
                 <q-btn icon="delete" size="sm" round flat @click="() => removeSlot(day, track, slot)" />
               </div>
               <div class="slot-content">
                 <div>{{ slot.eventName }}</div>
+                <div>{{ slot.location }}</div>
                 <div>{{ slot.persons }}</div>
               </div>
             </div>
@@ -54,19 +55,31 @@ export default defineComponent({
       delete track.slots[slot.id];
       if (Object.values(track.slots).length === 0) delete day.tracks[track.id];
     },
+
+    nextBlock(block: Time): Time {
+      const result = new Time(block.hour, block.minute);
+      result.addMinutes(30);
+      return result;
+    },
   },
   computed: {
-    timeBlocks() {
-      const blockSize = 30;
+    timeBlocks(): Time[] {
+      const blockSize = 1;
       const time = new Time(8, 0);
 
       const result = [];
+      // while (time.hour <= 17 || (time.hour === 18 && time.minute === 0)) {
       while (time.hour <= 17) {
         result.push(new Time(time.hour, time.minute));
         time.addMinutes(blockSize);
       }
 
       return result;
+    },
+    CssGridTemplateRows() {
+      return {
+        'grid-template-rows': this.timeBlocks.map((block) => `[time-${block.toKey()}] 1fr`).join(' '),
+      };
     },
   },
 });
@@ -90,27 +103,6 @@ export default defineComponent({
 
 .track {
   display: grid;
-  grid-template-rows:
-    [time-0800] 1fr
-    [time-0830] 1fr
-    [time-0900] 1fr
-    [time-0930] 1fr
-    [time-1000] 1fr
-    [time-1030] 1fr
-    [time-1100] 1fr
-    [time-1130] 1fr
-    [time-1200] 1fr
-    [time-1230] 1fr
-    [time-1300] 1fr
-    [time-1330] 1fr
-    [time-1400] 1fr
-    [time-1430] 1fr
-    [time-1500] 1fr
-    [time-1530] 1fr
-    [time-1600] 1fr
-    [time-1630] 1fr
-    [time-1700] 1fr
-    [time-1730] 1fr;
 }
 
 .day-track {

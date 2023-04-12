@@ -71,13 +71,15 @@ export class Track {
 export class Slot {
   id: string;
   eventName: string;
+  location: string;
   persons: string;
   start: Time;
   end: Time;
 
-  constructor(id: string, eventName: string, persons: string, start: Time, end: Time) {
+  constructor(id: string, eventName: string, location: string, persons: string, start: Time, end: Time) {
     this.id = id;
     this.eventName = eventName;
+    this.location = location;
     this.persons = persons;
     this.start = start;
     this.end = end;
@@ -96,8 +98,16 @@ export class Time {
   static parse(str: string): Time {
     const splits = str.split(':');
 
-    const hour = Number(splits[0]);
-    const minute = Number(splits[1]);
+    if (splits.length !== 2) throw Error('Invalid time format');
+
+    const hour = parseInt(splits[0]);
+    const minute = parseInt(splits[1]);
+
+    if (Number.isNaN(hour) || Number.isNaN(minute)) throw Error('Invalid time value');
+
+    if (hour < 0 || hour > 23) throw new Error('Invalid hour value');
+    if (minute < 0 || minute > 59) throw new Error('Invalid minute value');
+
     return new Time(hour, minute);
   }
 
@@ -125,6 +135,14 @@ export class Time {
   public equals = (timeB: Time): boolean => {
     return this.hour === timeB.hour && this.minute === timeB.minute;
   };
+
+  public static minutesBetween(timeA: Time, timeB: Time): number {
+    if (timeA.equals(timeB)) return 0;
+    if (timeA.isAfter(timeB)) return this.minutesBetween(timeB, timeA);
+
+    const hoursBetween = timeB.hour - timeA.hour;
+    return hoursBetween * 60 + timeB.minute - timeA.minute;
+  }
 }
 
 export const useScheduleStore = defineStore(
@@ -132,8 +150,8 @@ export const useScheduleStore = defineStore(
   () => {
     const days: Ref<Day[]> = ref([new Day('Maandag'), new Day('Dinsdag'), new Day('Woensdag'), new Day('Donderdag'), new Day('Vrijdag')]);
 
-    const createSlot = (eventName: string, persons: string, start: Time, end: Time) => {
-      return new Slot(uuidv4(), eventName, persons, start, end);
+    const createSlot = (eventName: string, location: string, persons: string, start: Time, end: Time) => {
+      return new Slot(uuidv4(), eventName, location, persons, start, end);
     };
 
     const getTrack = (dayIndex: number, slot: Slot) => {
@@ -161,7 +179,7 @@ export const useScheduleStore = defineStore(
           Object.values(rawDay.tracks).forEach((rawTrack) => {
             const validSlots: { [key: string]: Slot } = {};
             Object.values(rawTrack.slots).forEach((rawSlot) => {
-              const validSlot = new Slot(rawSlot.id, rawSlot.eventName, rawSlot.persons, new Time(rawSlot.start.hour, rawSlot.start.minute), new Time(rawSlot.end.hour, rawSlot.end.minute));
+              const validSlot = new Slot(rawSlot.id, rawSlot.eventName, rawSlot.location, rawSlot.persons, new Time(rawSlot.start.hour, rawSlot.start.minute), new Time(rawSlot.end.hour, rawSlot.end.minute));
               validSlots[validSlot.id] = validSlot;
             });
 
