@@ -143,6 +143,10 @@ export class Time {
     const hoursBetween = timeB.hour - timeA.hour;
     return hoursBetween * 60 + timeB.minute - timeA.minute;
   }
+
+  public static fromTime(time: Time): Time {
+    return new Time(time.hour, time.minute);
+  }
 }
 
 export const useScheduleStore = defineStore(
@@ -154,7 +158,7 @@ export const useScheduleStore = defineStore(
       return new Slot(uuidv4(), eventName, location, persons, start, end);
     };
 
-    const getTrack = (dayIndex: number, slot: Slot) => {
+    const getTrack = (dayIndex: number, slot: Slot): Track => {
       const track = days.value[dayIndex].findTrackForSlot(slot);
       if (track !== undefined) return track;
 
@@ -166,7 +170,14 @@ export const useScheduleStore = defineStore(
       track.slots[slot.id] = slot;
     };
 
-    return { days, createSlot, getTrack, addSlot };
+    const findTrack = (slot: Slot): Track | undefined => {
+      for (let i = 0; i < days.value.length; i++) {
+        const track = days.value[i].getTracks().find((t) => t.slots[slot.id] !== undefined);
+        if (track !== undefined) return track;
+      }
+    };
+
+    return { days, createSlot, getTrack, addSlot, findTrack };
   },
   {
     persist: {

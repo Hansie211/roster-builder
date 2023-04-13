@@ -1,20 +1,24 @@
 <template>
   <q-page>
-    <q-btn icon="add" @click="onAdd" class="q-mt-sm print-hide" round color="primary" />
-    <div class="schedule track">
-      <div class="time-slots track full-track" :style="CssGridTemplateRows">
+    <div class="q-gutter-x-sm print-hide">
+      <q-btn icon="add" @click="onAdd" class="q-mt-sm" round color="primary" />
+      <q-btn icon="print" @click="doPrint" class="q-mt-sm" round color="primary" />
+    </div>
+    <div class="schedule track" id="schedule">
+      <div class="time-slots track full-track">
         <div v-for="block in timeBlocks.filter((block) => block.minute === 0 || block.minute === 30)" :key="block.toKey()" class="time-slot" :style="{ 'grid-row': `time-${block.toKey()} / time-${nextBlock(block).toKey()}` }">
-          <div v-if="block.minute === 0" class="line"></div>
+          <div class="line"></div>
           {{ block }}
         </div>
       </div>
 
-      <div class="day-track full-track" v-for="day in schedule.days" :key="day.name">
+      <div class="day-track full-track" v-for="(day, dayIndex) in schedule.days" :key="day.name">
         <div class="title text-h5 q-pt-sm">{{ day.name }}</div>
         <div class="tracks">
-          <div class="track" :style="CssGridTemplateRows" v-for="track in day.getTracks()" :key="track.id">
+          <div class="track" v-for="track in day.getTracks()" :key="track.id">
             <div v-for="slot in track.getSlots()" :key="slot.id" class="slot" :style="{ 'grid-row': `time-${slot.start.toKey()} / time-${slot.end.toKey()}` }">
-              <div class="slot-header flex row justify-end">
+              <div class="slot-header flex row justify-end print-hide">
+                <q-btn icon="edit" size="sm" round flat @click="() => onEdit(slot, dayIndex)" />
                 <q-btn icon="delete" size="sm" round flat @click="() => removeSlot(day, track, slot)" />
               </div>
               <div class="slot-content">
@@ -34,24 +38,83 @@
 import { defineComponent } from 'vue';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Day, Slot, Time, Track, useScheduleStore } from 'src/stores/schedule-store';
-import AddSlotDialog from 'src/components/dialogs/AddSlotDialog.vue';
+import AddSlotDialog, { Event } from 'src/components/dialogs/AddSlotDialog.vue';
+import { useMeta } from 'quasar';
+import ConfirmDialog from 'src/components/dialogs/ConfirmDialog.vue';
+import { useConfirmSkipStore } from 'src/stores/confirm-skip-store';
 
 export default defineComponent({
   name: 'IndexPage',
   setup() {
     const schedule = useScheduleStore();
+    const skipStore = useConfirmSkipStore();
+
+    useMeta(() => {
+      return {
+        title: 'Rooster LIV',
+      };
+    });
 
     return {
       schedule,
+      skipStore,
     };
   },
   methods: {
-    onAdd() {
-      this.$q.dialog({
-        component: AddSlotDialog,
-      });
+    doPrint() {
+      window.print();
     },
-    removeSlot(day: Day, track: Track, slot: Slot) {
+    onAdd() {
+      this.$q
+        .dialog({
+          component: AddSlotDialog,
+        })
+        .onOk((event: Event) => {
+          const slot = this.schedule.createSlot(event.name.trim(), event.location.trim(), event.host.trim(), Time.parse(event.timeStart), Time.parse(event.timeEnd));
+          const track = this.schedule.getTrack(event.dayIndex, slot);
+          this.schedule.addSlot(event.dayIndex, track.id, slot);
+        });
+    },
+    onEdit(slot: Slot, dayIndex: number) {
+      this.$q
+        .dialog({
+          component: AddSlotDialog,
+          componentProps: {
+            existingEvent: Event.fromSlot(slot, dayIndex),
+          },
+        })
+        .onOk(async (event: Event) => {
+          const track = this.schedule.findTrack(slot);
+          if (track === undefined) {
+            console.error(`Cannot find track for '${slot.id}'.`);
+            return;
+          }
+
+          await this.removeSlot(this.schedule.days[dayIndex], track, slot, true);
+
+          const newSlot = this.schedule.createSlot(event.name.trim(), event.location.trim(), event.host.trim(), Time.parse(event.timeStart), Time.parse(event.timeEnd));
+          const newTrack = this.schedule.getTrack(event.dayIndex, newSlot);
+          this.schedule.addSlot(event.dayIndex, newTrack.id, newSlot);
+        });
+    },
+    async removeSlot(day: Day, track: Track, slot: Slot, skipConfirm = false): Promise<void> {
+      const skipId = 'CONFIRM_REMOVE_SLOT';
+
+      if (!skipConfirm && !this.skipStore.hasSkip(skipId)) {
+        await new Promise((resolve, reject) =>
+          this.$q
+            .dialog({
+              component: ConfirmDialog,
+              componentProps: {
+                text: `Weet je zeker dat je '${slot.eventName}' op ${day.name.toLocaleLowerCase()} wilt verwijderen?`,
+                skipId,
+              },
+            })
+            .onOk(resolve)
+            .onCancel(reject)
+        );
+      }
+
       delete track.slots[slot.id];
       if (Object.values(track.slots).length === 0) delete day.tracks[track.id];
     },
@@ -68,7 +131,6 @@ export default defineComponent({
       const time = new Time(8, 0);
 
       const result = [];
-      // while (time.hour <= 17 || (time.hour === 18 && time.minute === 0)) {
       while (time.hour <= 17) {
         result.push(new Time(time.hour, time.minute));
         time.addMinutes(blockSize);
@@ -76,9 +138,16 @@ export default defineComponent({
 
       return result;
     },
-    CssGridTemplateRows() {
+
+    cssData() {
+      const trackWidth = 140;
+      const element = document.getElementById('schedule');
+
       return {
-        'grid-template-rows': this.timeBlocks.map((block) => `[time-${block.toKey()}] 1fr`).join(' '),
+        templateRows: this.timeBlocks.map((block) => `[time-${block.toKey()}] 1fr`).join(' '),
+        trackWidth: `${trackWidth}px`,
+        lineSize: (80 + this.schedule.days.map((d) => Math.max(150, d.getTracks().length * trackWidth)).reduce((state, value) => state + value, 0)).toString() + 'px',
+        pageSize: `${element?.offsetWidth}px ${element?.offsetHeight}px landscape`,
       };
     },
   },
@@ -88,21 +157,22 @@ export default defineComponent({
 <style scoped>
 @media print {
   @page {
-    size: A4 landscape;
+    size: v-bind('cssData.pageSize');
   }
 
-  body {
+  /* body {
     zoom: 50%;
-  }
+  } */
 }
 .schedule {
-  height: 100%;
+  min-height: 100%;
   grid-template-columns: min-content;
-  width: fit-content;
+  width: max-content;
 }
 
 .track {
   display: grid;
+  grid-template-rows: v-bind('cssData.templateRows');
 }
 
 .day-track {
@@ -134,7 +204,7 @@ export default defineComponent({
 }
 
 .tracks .track {
-  width: 130px;
+  width: v-bind('cssData.trackWidth');
   overflow: hidden;
 }
 
@@ -181,7 +251,8 @@ export default defineComponent({
 }
 
 .full-track {
-  grid-row: 1 / 100;
+  grid-row: 1 / 100000;
+  min-height: 100%;
 }
 
 .time-slot {
@@ -189,7 +260,7 @@ export default defineComponent({
 }
 .line {
   height: 1px;
-  width: calc(100px + 400px * 5);
+  width: v-bind('cssData.lineSize');
   border-top: 1px dotted rgba(0, 0, 0, 0.5);
   position: absolute;
   z-index: -1;
